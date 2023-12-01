@@ -586,7 +586,7 @@ class CoSLAM():
             else:
                 kf_id = torch.div(i, self.config['mapping']['keyframe_every'], rounding_mode='trunc')
                 kf_frame_id = kf_id * self.config['mapping']['keyframe_every']
-                c2w_key = self.est_c2w_data[kf_frame_id]
+                c2w_key = self.est_c2w_data[kf_frame_id.item()]
                 delta = self.est_c2w_data_rel[i] 
                 poses[i] = delta @ c2w_key
         
