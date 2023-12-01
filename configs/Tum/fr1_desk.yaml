@@ -3,7 +3,7 @@ mapping:
   bound: [[-3.5,3],[-3,3],[-3,3]]
   marching_cubes_bound: [[-3.5,3],[-3,3],[-3,3]]
 data:
-  datadir: data/TUM/rgbd_dataset_freiburg1_desk
+  datadir: /data/datasets/DeepSLAM/tum_rgbd/rgbd_dataset_freiburg1_desk
   trainskip: 1
   output: output/TUM/fr_desk
   exp_name: demo

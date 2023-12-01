@@ -79,7 +79,7 @@ class CoSLAM():
         '''
         Create the keyframe database
         '''
-        num_kf = int(self.dataset.num_frames // self.config['mapping']['keyframe_every'] + 1)  
+        num_kf = int( torch.div(self.dataset.num_frames, self.config['mapping']['keyframe_every'], rounding_mode='trunc') + 1)
         print('#kf:', num_kf)
         print('#Pixels to save:', self.dataset.num_rays_to_save)
         return KeyFrameDatabase(config, 
@@ -177,7 +177,7 @@ class CoSLAM():
             self.map_optimizer.zero_grad()
             indice = self.select_samples(self.dataset.H, self.dataset.W, self.config['mapping']['sample'])
             
-            indice_h, indice_w = indice % (self.dataset.H), indice // (self.dataset.H)
+            indice_h, indice_w = indice % (self.dataset.H), torch.div(indice, self.dataset.H, rounding_mode='trunc')
             rays_d_cam = batch['direction'].squeeze(0)[indice_h, indice_w, :].to(self.device)
             target_s = batch['rgb'].squeeze(0)[indice_h, indice_w, :].to(self.device)
             target_d = batch['depth'].squeeze(0)[indice_h, indice_w].to(self.device).unsqueeze(-1)
@@ -225,7 +225,7 @@ class CoSLAM():
             self.cur_map_optimizer.zero_grad()
             indice = self.select_samples(self.dataset.H, self.dataset.W, self.config['mapping']['sample'])
             
-            indice_h, indice_w = indice % (self.dataset.H), indice // (self.dataset.H)
+            indice_h, indice_w = indice % (self.dataset.H), torch.div(indice, self.dataset.H, rounding_mode='trunc')
             rays_d_cam = batch['direction'].squeeze(0)[indice_h, indice_w, :].to(self.device)
             target_s = batch['rgb'].squeeze(0)[indice_h, indice_w, :].to(self.device)
             target_d = batch['depth'].squeeze(0)[indice_h, indice_w].to(self.device).unsqueeze(-1)
@@ -332,12 +332,11 @@ class CoSLAM():
             rays, ids = self.keyframeDatabase.sample_global_rays(self.config['mapping']['sample'])
 
             #TODO: Checkpoint...
-            idx_cur = random.sample(range(0, self.dataset.H * self.dataset.W),max(self.config['mapping']['sample'] // len(self.keyframeDatabase.frame_ids), self.config['mapping']['min_pixels_cur']))
+            idx_cur = random.sample(range(0, self.dataset.H * self.dataset.W),max(torch.div(self.config['mapping']['sample'], len(self.keyframeDatabase.frame_ids), rounding_mode='trunc'), self.config['mapping']['min_pixels_cur']))
             current_rays_batch = current_rays[idx_cur, :]
 
             rays = torch.cat([rays, current_rays_batch], dim=0) # N, 7
-            ids_all = torch.cat([ids//self.config['mapping']['keyframe_every'], -torch.ones((len(idx_cur)))]).to(torch.int64)
-
+            ids_all = torch.cat([torch.div(ids, self.config['mapping']['keyframe_every'], rounding_mode='trunc'), -torch.ones((len(idx_cur)))]).to(torch.int64)
 
             rays_d_cam = rays[..., :3].to(self.device)
             target_s = rays[..., 3:6].to(self.device)
@@ -486,7 +485,7 @@ class CoSLAM():
 
         if frame_id % self.config['mapping']['keyframe_every'] != 0:
             # Not a keyframe, need relative pose
-            kf_id = frame_id // self.config['mapping']['keyframe_every']
+            kf_id = torch.div(frame_id,self.config['mapping']['keyframe_every'], rounding_mode='trunc')
             kf_frame_id = kf_id * self.config['mapping']['keyframe_every']
             c2w_key = self.est_c2w_data[kf_frame_id]
             delta = self.est_c2w_data[frame_id] @ c2w_key.float().inverse()
@@ -531,7 +530,7 @@ class CoSLAM():
                 indice = self.select_samples(self.dataset.H-iH*2, self.dataset.W-iW*2, self.config['tracking']['sample'])
             
                 # Slicing
-                indice_h, indice_w = indice % (self.dataset.H - iH * 2), indice // (self.dataset.H - iH * 2)
+                indice_h, indice_w = indice % (self.dataset.H - iH * 2), torch.div(indice, (self.dataset.H - iH * 2), rounding_mode='trunc')
                 rays_d_cam = batch['direction'].squeeze(0)[iH:-iH, iW:-iW, :][indice_h, indice_w, :].to(self.device)
             target_s = batch['rgb'].squeeze(0)[iH:-iH, iW:-iW, :][indice_h, indice_w, :].to(self.device)
             target_d = batch['depth'].squeeze(0)[iH:-iH, iW:-iW][indice_h, indice_w].to(self.device).unsqueeze(-1)
@@ -571,9 +570,9 @@ class CoSLAM():
 
        # Save relative pose of non-keyframes
         if frame_id % self.config['mapping']['keyframe_every'] != 0:
-            kf_id = frame_id // self.config['mapping']['keyframe_every']
+            kf_id = torch.div(frame_id, self.config['mapping']['keyframe_every'], rounding_mode='trunc')   
             kf_frame_id = kf_id * self.config['mapping']['keyframe_every']
-            c2w_key = self.est_c2w_data[kf_frame_id]
+            c2w_key = self.est_c2w_data[kf_frame_id.item()]
             delta = self.est_c2w_data[frame_id] @ c2w_key.float().inverse()
             self.est_c2w_data_rel[frame_id] = delta
         
@@ -585,7 +584,7 @@ class CoSLAM():
             if i % self.config['mapping']['keyframe_every'] == 0:
                 poses[i] = self.est_c2w_data[i]
             else:
-                kf_id = i // self.config['mapping']['keyframe_every']
+                kf_id = torch.div(i, self.config['mapping']['keyframe_every'], rounding_mode='trunc')
                 kf_frame_id = kf_id * self.config['mapping']['keyframe_every']
                 c2w_key = self.est_c2w_data[kf_frame_id]
                 delta = self.est_c2w_data_rel[i] 
