@@ -22,7 +22,7 @@ def get_dataset(config):
     elif config['dataset'] == 'synthetic':
         dataset = RGBDataset
     
-    elif config['dataset'] == 'tum':
+    elif config['dataset'] == 'tumrgbd':
         dataset = TUMDataset
     
     elif config['dataset'] == 'azure':
@@ -36,7 +36,7 @@ def get_dataset(config):
 
     
     return dataset(config, 
-                   config['data']['datadir'], 
+                   config['data']['input_folder'], 
                    trainskip=config['data']['trainskip'], 
                    downsample_factor=config['data']['downsample'], 
                    sc_factor=config['data']['sc_factor'])

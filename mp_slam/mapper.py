@@ -4,6 +4,7 @@ import torch
 import time
 import os
 import random
+from deps.Co_SLAM.mp_slam.cull_mesh import cull_mesh
 
 class Mapper():
     def __init__(self, config, SLAM) -> None:
@@ -11,6 +12,7 @@ class Mapper():
         self.slam = SLAM
         self.model = SLAM.model
         self.tracking_idx = SLAM.tracking_idx
+        self.output = SLAM.output
         self.mapping_idx = SLAM.mapping_idx
         self.mapping_first_frame = SLAM.mapping_first_frame
         self.keyframe = SLAM.keyframeDatabase
@@ -224,19 +226,31 @@ class Mapper():
             
                 if self.mapping_idx[0] % self.config['mesh']['vis']==0:
                     idx = int(self.mapping_idx[0])
-                    self.slam.save_mesh(idx, voxel_size=self.config['mesh']['voxel_eval'])
+                    mesh_savepath = f'{self.output}/mesh/{idx:05d}_mesh.ply'
+                    self.slam.save_mesh(idx, mesh_savepath,  voxel_size=self.config['mesh']['voxel_eval'])
                     pose_relative = self.convert_relative_pose(idx)
-                    self.slam.pose_eval_func()(self.slam.pose_gt, self.est_c2w_data[:idx], 1, os.path.join(self.config['data']['output'], self.config['data']['exp_name']), idx)
-                    self.slam.pose_eval_func()(self.slam.pose_gt, pose_relative, 1, os.path.join(self.config['data']['output'], self.config['data']['exp_name']), idx, img='pose_r', name='output_relative.txt')
-                
+                    self.slam.pose_eval_func()(self.slam.pose_gt, self.est_c2w_data[:idx], 1, os.path.join(self.output, "ate_result"), idx)
+                    self.slam.pose_eval_func()(self.slam.pose_gt, pose_relative, 1, os.path.join(self.output, "ate_result"), idx, img='pose_r', name='output_relative.txt')
+                    if self.config['mapping']['eval_rec']:
+                        mesh_rec_file = f'{self.output}/mesh/{idx:05d}_rec_mesh.ply'
+                        cull_mesh(mesh_savepath, self.config, self.device, mesh_rec_file, estimate_c2w_list=self.est_c2w_data[:idx+1])
+
                 time.sleep(0.2)
 
         idx = int(self.tracking_idx[0])       
-        self.slam.save_mesh(idx, voxel_size=self.config['mesh']['voxel_final'])
+        mesh_savepath = f'{self.output}/mesh/final_mesh.ply'
+        self.slam.save_mesh(idx, mesh_savepath, voxel_size=self.config['mesh']['voxel_final'])
         pose_relative = self.convert_relative_pose(idx)
-        self.slam.pose_eval_func()(self.slam.pose_gt, self.est_c2w_data[:idx], 1, os.path.join(self.config['data']['output'], self.config['data']['exp_name']), idx)
-        self.slam.pose_eval_func()(self.slam.pose_gt, pose_relative, 1, os.path.join(self.config['data']['output'], self.config['data']['exp_name']), idx, img='pose_r', name='output_relative.txt')
+        self.slam.pose_eval_func()(self.slam.pose_gt, self.est_c2w_data[:idx], 1, os.path.join(self.output, "ate_result"), idx)
+        self.slam.pose_eval_func()(self.slam.pose_gt, pose_relative, 1, os.path.join(self.output, "ate_result"), idx, img='pose_r', name='output_relative.txt')
 
-        
-        
-        
+        if self.config['mapping']['eval_rec']:
+            mesh_rec_file = f'{self.output}/mesh/final_mesh_eval_rec.ply'
+            cull_mesh(mesh_savepath, self.config, self.device, mesh_rec_file, estimate_c2w_list=self.est_c2w_data)
+        # save pose eval.tar
+        path = os.path.join(self.slam.ckptsdir, 'eval.tar')
+        torch.save({
+            'gt_c2w_list': self.slam.pose_gt,
+            'estimate_c2w_list': self.est_c2w_data[:idx],
+            'idx': idx,
+        }, path, _use_new_zipfile_serialization=False)
